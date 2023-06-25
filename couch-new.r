@@ -3,18 +3,16 @@ library(httr)
 url <- "http://pip:5984/p"
 auth <- authenticate("admin", "mallakaY23")
 
-addDoc <- function() {
-    r <- POST(url, body = list(new = TRUE), encode = "json", auth)
+addDoc <- function(name) {
+    r <- POST(url, body = list(new = TRUE, name = name), encode = "json", auth)
     stop_for_status(r)
     return(content(r, "parsed", "application/json"))
 }
-
 getDocRev <- function(id) {
     r <- GET(paste(url, id, sep = "/"), auth)
     stop_for_status(r)
     return(content(r, "parsed", "application/json")$`_rev`)
 }
-
 add2Doc <- function(id, p) {
     rev <- getDocRev(id)
     stopifnot(!is.null(rev))
@@ -37,13 +35,14 @@ uploadFile <- function(path, id, rev) {
     stop_for_status(r)
     unlink(path)
     print(paste(" ", "-->", path))
-    return(content(r, "parsed", "application/json")$revq
+    return(content(r, "parsed", "application/json")$rev)
 }
 fWalk <- function(p) {
-    print(p)
-    files <- list.files(path = p, include.dirs = TRUE, full.names = TRUE, recursive = "FALSE")
+    name <- basename(p)
+    print(name)
+    files <- list.files(path = p, include.dirs = TRUE, full.names = TRUE, recursive = FALSE)
     if (length(files) > 0) {
-        doc <- addDoc()
+        doc <- addDoc(name)
         id <- doc$id
         print(paste("new document:", id))
         rev <- doc$rev
@@ -54,7 +53,16 @@ fWalk <- function(p) {
                 rev <- uploadFile(f, id, rev)
             }
         }
+        if (length(list.files(path = p, include.dirs = TRUE, recursive = FALSE)) == 0) {
+            unlink(p, recursive = TRUE)
+        }
     }
-    unlink(p, recursive = TRUE)
 }
+uploadSingleFile <- function(f) (
+    if(file.exists(f) && !dir.exists(f)) {
+        doc <- addDoc(basename(f))
+        uploadFile(f, doc$id, doc$rev)
+    }
+
+)
 
